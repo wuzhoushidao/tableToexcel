@@ -1,0 +1,303 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <script type="text/javascript" src="http://ajax.aspnetcdn.com/ajax/jquery/jquery-2.1.4.min.js"></script>
+    <script type="text/javascript" src="../JS/bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="../stylesheet/bootstrap.min.css"/>
+    <style>
+        .textcenter {
+            text-align: center;
+        }
+        .controlwidth {
+            width: 98%;
+        }        th{
+            text-align:center;
+        }
+        body {
+            background-color: #FAF0E6;
+        }
+        .panel-body {
+            background-color: #FAF0E6;
+        }
+        input[type=date]::-webkit-inner-spin-button {
+            visibility: hidden;
+        }
+    </style>
+    <script>
+        var station;
+        var all;
+        $(function () {
+
+            //  $("#date").text(getDateStr(-1));
+            $("#input_monday").val(getDateStr(-1));
+            var title = window.opener.document.getElementById("lblTitle").innerText;
+            var tableName = 0;
+            if (title == "SOC不齐电芯查看") {
+                tableName = 1;
+                all = window.opener.document.getElementById("QueryPara1_e15eb38a-c93d-11e8-8c27-00163e000110").options;
+                station = window.opener.document.getElementById("QueryPara1_e15eb38a-c93d-11e8-8c27-00163e000110").value;
+            } else {
+                station = window.opener.document.getElementById("QueryPara1_2cc329db-cba3-11e8-8c27-00163e000110").value;
+                all = window.opener.document.getElementById("QueryPara1_2cc329db-cba3-11e8-8c27-00163e000110").options;
+            }
+            //console.log(station);
+            if (station == "") {
+                
+                for (var i = 1; i < all.length; i++) {
+                     
+                    getdata(all[i].value, '-1');
+                   // getdataLow(station,0);
+                }
+            } else {
+                getdata(station,'-1');
+              //  getdataLow(station, 0);
+
+            }
+            
+            $("#download").click(function () {
+                tableToExcel("conAll", $("#input_monday").val());
+            //    $.ajax({
+            //        type: 'post',
+            //        url: "ajax.asmx/DataToExcel",
+            //        dataType: 'json',
+            //        contentType: "application/json; charset=utf-8",
+            //        data: "{'stations':'" + station + "'}",
+            //        success: function (res) {
+            //            alert(1);
+            //        }
+            //    })
+            });
+            $("#input_monday").change(function () {
+                getDateData();
+            });
+        });
+        function getdata(station, date) {
+            $.ajax({
+                type: 'post',
+                url: "ajax.asmx/getSocData",
+                dataType: "json",
+                contentType: "application/json; charset=utf-8",
+                timeout: 3000,
+                data: "{'station':'" + station + "','date':'" + date + "'}",
+                success: function (res) {
+                    var data = eval('(' + res["d"] + ')');
+                    if (data.length > 0) {
+                        var count = 0;
+                        $("#container").append("<div class=\"panel panel-success\"><div class=\"panel-heading\" style='text-align:center;'><h3 class=\"panel-title\">" + data[0] + "</h3></div><div class=\"panel-body\" id='a" + station + "'></div></div>");
+                        $("#a" + station).append("<table id='down' class='table table-hover controlwidth textcenter'><tr><th>箱-堆-簇</th><th>包-单体</th><th>系数(V)</th><th>问题描述</th><th>最大温差(℃)</th><th>最高温度(℃)</th><th>累积次数</th><th>首次出现日期</th><th>解决方案</th></tr></table>");
+                        for (var i = 0; i < data[1].length; i++) {
+                            count++;
+                            $("#a" + station + " table").append("<tr><td>&nbsp;" + data[1][i].BoxBmsCLu + "&nbsp;</td><td>&nbsp;" + data[1][i].PackCell + "&nbsp;</td><td class='a" + station + "'>" + data[1][i].Parameter + "</td><td class='b" + station + "'>" + data[1][i].Remark + "</td><td>" + data[1][i].MaxDiffTemp + "</td><td>" + data[1][i].MaxTemp +
+                                "</td><td>" + data[1][i].Count + "</td><td>" + data[1][i].FirstOccurrence.slice(0, 10) + "</td></tr>");
+
+                            if (i > 0) {
+                                var value1 = $(".a" + station).eq(i - 1).text();
+                                var value2 = $(".a" + station).eq(i).text();
+                                var remark1 = $(".b" + station).eq(i - 1).text();
+                                var remark2 = $(".b" + station).eq(i).text();
+                                var par = $(".b" + station).eq(i - 1).parent();
+                                if (remark1 == "短板") {
+
+                                    if (value1 < 0.25 && value2 >= 0.25) {
+                                        $(".b" + station).eq(i - count + 1).parent().append("<td rowspan='" + count + "' style='vertical-align:middle;'>" + "观察" + "<td/>");
+                                        par.after("<tr style='background-color:#FFEBCD'><td colspan='9'></td></tr>");
+                                        count = 1;
+
+                                    } else if (value1 >= 0.25 && value1 < 0.4 && value2 > 0.4) {
+                                        $(".b" + station).eq(i - count + 1).parent().append("<td rowspan='" + count + "' style='vertical-align:middle;'>" + "重点关注" + "<td/>");
+                                        par.after("<tr style='background-color:#FFEBCD'><td colspan='9'></td></tr>");
+                                        count = 1;
+                                    }
+                                    if (i == data[1].length - 1) {
+                                        if (value2 < 0.25) {
+                                            remark1 = "观察";
+                                        } else if (value2 > 0.4) {
+                                            remark1 = "更换";
+                                        } else {
+                                            remark1 = "重点关注";
+                                        }
+                                        $(".b" + station).eq(i - count + 1).parent().append("<td rowspan='" + count + "' style='vertical-align:middle;'>" + remark1 + "<td/>");
+                                    }
+                                } else {
+                                    if (remark2 == "短板") {
+
+                                        if (value1 < 0.4) {
+                                            remark1 = "观察";
+                                        } else {
+                                            remark1 = "手动均衡";
+                                        }
+                                        $(".b" + station).eq(i - count + 1).parent().append("<td rowspan='" + count + "' style='vertical-align:middle;'>" + remark1 + "<td/>");
+                                        par.after("<tr style='background-color:#FFEBCD'><td colspan='9'></td></tr>");
+                                        count = 1;
+                                        if (i == data[1].length - 1) {
+                                            if (value2 < 0.25) {
+                                                remark1 = "观察";
+                                            } else if (value2 > 0.4) {
+                                                remark1 = "更换";
+                                            } else {
+                                                remark1 = "重点关注";
+                                            }
+                                            $(".b" + station).eq(i - count + 1).parent().append("<td rowspan='" + count + "' style='vertical-align:middle;'>" + remark1 + "<td/>");
+                                        }
+                                    } else {
+                                        if (value1 < 0.4 && value2 >= 0.4) {
+                                            $(".b" + station).eq(0).parent().append("<td rowspan='" + count + "' style='vertical-align:middle;'>" + "观察" + "<td/>");
+                                            par.after("<tr style='background-color:#FFEBCD'><td colspan='9'></td></tr>");
+                                            count = 1;
+                                        } else {
+                                            if (i == data[1].length - 1) {
+                                                if (value2 < 0.4) {
+                                                    remark1 = "观察";
+                                                } else {
+                                                    remark1 = "手动均衡";
+                                                }
+                                                $(".b" + station).eq(i - count + 1).parent().append("<td rowspan='" + count + "' style='vertical-align:middle;'>" + remark1 + "<td/>");
+                                                par.after("<tr style='background-color:#FFEBCD'><td colspan='9'></td></tr>");
+                                            }
+                                        }
+
+                                    }
+                                }
+
+                            } else if (i == 0 && i == data[1].length - 1) {
+                                var value2 = $(".a" + station).eq(i).text();
+                                var remark2 = $(".b" + station).eq(i).text();
+                                if (remark2 != "短板") {
+                                    if (value2 < 0.4) {
+                                        remark2 = "观察";
+                                    } else {
+                                        remark2 = "手动均衡";
+                                    }
+                                    $(".b" + station).eq(i - count + 1).parent().append("<td rowspan='" + count + "' style='vertical-align:middle;'>" + remark2 + "<td/>");
+                                } else {
+                                    if (value2 < 0.25) {
+                                        remark2 = "观察";
+                                    } else if (value2 > 0.4) {
+                                        remark2 = "更换";
+                                    } else {
+                                        remark2 = "重点关注";
+                                    }
+                                    $(".b" + station).eq(i - count + 1).parent().append("<td rowspan='" + count + "' style='vertical-align:middle;'>" + remark2 + "<td/>");
+                                }
+                            }
+                        }
+                    }
+                    //if (data.length > 0) {
+                    //    $("#container").append("<div class=\"panel panel-default\"><div class=\"panel-heading\" style='text-align:center;'><h3 class=\"panel-title\">" + data[0] + "</h3></div><div class=\"panel-body\" id='a" + station + "'></div></div>");
+                    //    $("#a" + station).append("<table class='controlwidth textcenter'><tr><th>箱-堆-簇</th><th>包-单体</th><th>系数</th><th>问题描述</th><th>最大温差</th><th>最高温度</th></tr></table>");
+
+                    //    for (var i = 0; i < data[1].length; i++) {
+                    //        $("#a" + station + " table").append("<tr><td>" + data[1][i] + "</td><td>" + data[2][i] + "</td><td class='a" + station + "'>" + data[3][i] + "</td><td>" + data[6][i] + "</td><td>" + data[4][i] + "</td><td>" + data[5][i] + "</td></tr>");
+                    //        var value = $(".a" + station).eq(i).text();
+                    //        if (value <= 0.25 && value > 0.18) {
+                    //            $(".a" + station).eq(i).parent().css("color", "#ff0000");
+                    //        } else if (value > 0.25) {
+                    //            $(".a" + station).eq(i).parent().css("color", "#00ff00");
+
+                    //        } else {
+                    //            $(".a" + station).eq(i).parent().css("color", "#0000ff");
+                    //        }
+                    //    };
+                    //}
+
+                }
+            });
+        }
+        function base64(content) {
+            return window.btoa(unescape(encodeURIComponent(content)));
+        }
+        function tableToExcel(tableID, fileName) {
+            var excelContent = $("#" + tableID).html();
+            // 		alert(excelContent);
+            var excelFile = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:x='urn:schemas-microsoft-com:office:excel' xmlns='http://www.w3.org/TR/REC-html40'>";
+            excelFile += "<head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>{worksheet}</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>";
+            excelFile += "<body><table width='10%'  border='1'>";
+            excelFile += excelContent;
+            excelFile += "</table></body>";
+            excelFile += "</html>";
+            var link = "data:application/vnd.ms-excel;base64," + base64(excelFile);
+            var a = document.createElement("a");
+            a.download = fileName + ".xls";
+            a.href = link;
+            a.click();
+        }
+       
+        function getDateStr(addCount) {
+            var dd = new Date();
+            dd.setDate(dd.getDate() + addCount);
+            var y = dd.getFullYear();
+            var m = ("0" + (dd.getMonth() + 1)).slice(-2); 
+            var d = ("0" + dd.getDate()).slice(-2);
+            return y + "-" + m + "-" + d;
+        }
+        function getDateData() {
+            var dd = new Date();
+            var s2 = new Date($("#input_monday").val());
+            var days = s2.getTime() - dd.getTime();
+            var time = parseInt(days / (1000 * 60 * 60 * 24));
+            $("#container").html("");
+            if (station == "") {
+                for (var i = 1; i < all.length; i++) {
+
+                    getdata(all[i].value, time);
+                    // getdataLow(station,0);
+                }
+            } else {
+               
+                getdata(station, time);
+            }
+            console.log(time);
+        }
+        function setDate(str) {
+
+            var value = $("#input_monday").val();
+            var dd = new Date(value);
+            dd.setDate(dd.getDate() + str);
+            var y = dd.getFullYear();
+            var m = ("0" + (dd.getMonth() + 1)).slice(-2);
+            var d = ("0" + dd.getDate()).slice(-2);
+         //   console.log(y + "-" + m + "-" + d);
+            $("#input_monday").val(y + "-" + m + "-" + d);
+            getDateData();
+        }
+        
+    </script>
+    <title></title>
+</head>
+<body>
+    <div id="conAll">
+        <div>
+            <table style="width:98%;">
+                <tr>
+                    <td style="width:20%;text-align:center;"><button class="btn-info" onclick="setDate(-1)"><span class="glyphicon glyphicon-step-backward"></span></button> <input type="date" id="input_monday" />
+                        <button class="btn-info" onclick="setDate(1)"><span class="glyphicon glyphicon-step-forward"></span></button>
+                    </td>
+                    <td style="width: 35%;">
+                        <table style="margin-left:25%;">
+                            <tr><td rowspan="2">soc不齐解决方案：</td><td><span class="glyphicon glyphicon-pencil"></span><span> 系数&lt;0.4: 观察</span></td></tr>
+                            <tr><td><span class="glyphicon glyphicon-pencil"></span><span> 系数≥0.4: 手动均衡</span></td></tr>
+                        </table>
+                    </td>
+                    <td style="width:35%;">
+                        <table style="margin-left:20%;">
+                            <tr><td rowspan="3">短板解决方案：</td><td><span class="glyphicon glyphicon-pencil"></span><span> 系数&lt;0.25: 观察</span></td></tr>
+                            <tr><td><span class="glyphicon glyphicon-pencil"></span><span> 0.25&lt;系数&gt;0.4: 重点关注</span></td></tr>
+                            <tr><td><span class="glyphicon glyphicon-pencil"></span><span> 系数≥0.4: 更换</span></td></tr>
+                        </table>
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-default btn-sm" id="download">
+                            <span class="glyphicon glyphicon-download-alt"></span>
+                        </button>
+
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div id="container">
+
+        </div>
+    </div>
+</body>
+</html>
